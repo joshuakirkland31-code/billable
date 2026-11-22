@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Billable tests</title>
+<style>body{background:#0b0f17;color:#e6edf3;font:14px ui-monospace,Menlo,Consolas,monospace;padding:16px}</style>
+</head>
+<body>
+<pre id="out">RUNNING</pre>
+<script type="module">
+import { run } from './harness.js';
+const files = [
+  'time.test.js',
+  'store.test.js',
+  'economy.test.js',
+  'streak.test.js',
+  'contracts.test.js',
+  'grades.test.js',
+  'courses.test.js',
+  'session.test.js',
+  'timelapse.test.js',
+  'office.test.js',
+  'achievements.test.js',
+  'review.test.js',
+  'backup.test.js',
+];
+const errors = [];
+for (const f of files) {
+  // Test files for not-yet-built tasks are skipped; any error importing an existing one fails.
+  const r = await fetch('./' + f, { method: 'HEAD', cache: 'no-store' });
+  if (!r.ok) continue;
+  try { await import('./' + f); }
+  catch (e) { errors.push(`${f}: ${e.message}`); }
+}
+await run(errors);
+</script>
+</body>
+</html>
