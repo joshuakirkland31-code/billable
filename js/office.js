@@ -79,6 +79,11 @@ export function renderOffice(career, rankIdx, onSlot) {
   svg.append(el('rect', { x: 0, y: 0, width: 360, height: 150, fill: wall }));
   svg.append(el('rect', { x: 0, y: 150, width: 360, height: 80, fill: floor }));
   svg.append(el('line', { x1: 0, y1: 150, x2: 360, y2: 150, stroke: '#f5c451', 'stroke-opacity': .25 }));
+  // wall panels, baseboard, ceiling lights, floor boards
+  for (let x = 0; x <= 360; x += 60) svg.append(el('line', { x1: x, y1: 0, x2: x, y2: 150, stroke: '#ffffff', 'stroke-opacity': .03 }));
+  svg.append(el('rect', { x: 0, y: 144, width: 360, height: 6, fill: '#000', 'fill-opacity': .25 }));
+  for (const lx of [90, 270]) svg.append(el('rect', { x: lx - 30, y: 0, width: 60, height: 4, rx: 2, fill: '#ffdf8a', 'fill-opacity': .35 }));
+  for (let x = -40; x <= 400; x += 50) svg.append(el('line', { x1: 180 + (x - 180) * .55, y1: 150, x2: x, y2: 230, stroke: '#000', 'stroke-opacity': .18 }));
   if (shell.id === 'cubicle') {
     svg.append(el('rect', { x: 110, y: 20, width: 140, height: 130, fill: 'none', stroke: '#3a475c', 'stroke-width': 3 }));
   }
