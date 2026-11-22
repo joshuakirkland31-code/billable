@@ -4,6 +4,7 @@ import { RANKS, rankIndex, rateFor, payFor, fineFor, payCtx } from './economy.js
 import { rolloverStreak, applySessionToStreak } from './streak.js';
 import { dailyContracts, evaluateContracts, byId, ALL_DONE_BONUS_MIN } from './contracts.js';
 import { computeCourse } from './grades.js';
+import { evaluateAchievements } from './achievements.js';
 
 export const GRACE_MS = 10000;
 const LIVE = new Set(['running', 'overtime']);
@@ -82,10 +83,8 @@ export function examMultFor(state, courseId, now) {
   return upcoming.length && upcoming[0].id === courseId ? 2 : 1.5;
 }
 
-const noAchievements = (s) => ({ state: s, newly: [] });
-
 /** Settle a finished session into state. Pure. */
-export function finalizeSession(state, a, now, evaluateAchievements = noAchievements) {
+export function finalizeSession(state, a, now, evaluate = evaluateAchievements) {
   let s = ensureDay(state, a.endedAt ?? now);
   const c = s.career;
   const day = dayKey(new Date(a.startedAt));
@@ -137,7 +136,7 @@ export function finalizeSession(state, a, now, evaluateAchievements = noAchievem
   const rankAfter = rankIndex(c.xp);
   if (rankAfter > rankBefore) receipt.promotedTo = RANKS[rankAfter].name;
 
-  const ach = evaluateAchievements(s, now);
+  const ach = evaluate(s, now);
   s = ach.state; receipt.newAchievements = ach.newly;
   return { state: s, receipt };
 }
