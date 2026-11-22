@@ -1,5 +1,5 @@
 // Offline app shell. Bump CACHE on every release. Never touches IndexedDB (your data).
-const CACHE = 'billable-v1';
+const CACHE = 'billable-v2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',

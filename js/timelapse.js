@@ -65,6 +65,20 @@ export function wouldExceedCap(metas, capBytes) {
   return metas.filter(m => m.starred).reduce((a, m) => a + m.bytes, 0) > capBytes;
 }
 
+/** Pure: session ids that have frames but no meta (and aren't the live session). */
+export function orphanIds(frameKeys, metaIds, keepId = null) {
+  const have = new Set(metaIds);
+  return [...new Set(frameKeys.map(k => String(k).split('#')[0]))].filter(id => !have.has(id) && id !== keepId);
+}
+
+export async function sweepOrphans(keepId = null) {
+  try {
+    const keys = await tx('frames', 'readonly', s => s.getAllKeys());
+    const metas = await listMeta();
+    for (const id of orphanIds(keys, metas.map(m => m.sessionId), keepId)) await deleteTimelapse(id);
+  } catch (e) { console.warn('sweep failed', e); }
+}
+
 export async function purge(now, capBytes) {
   try {
     const ids = planPurge(await listMeta(), now, capBytes);

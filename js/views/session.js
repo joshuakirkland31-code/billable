@@ -1,9 +1,9 @@
 // Clock In: pick course + length, then a camera-watched, leave-the-app-and-fail session.
 import { h, money, fmtClock, fmtMin, toast, confirmSheet, openSheet } from '../dom.js';
-import { startSession, onHide, onShow, elapsedMs, tick, walkOut, clockOut, finalizeSession, examMultFor, GRACE_MS } from '../session.js';
+import { startSession, onHide, onShow, elapsedMs, tick, walkOut, clockOut, finalizeSession, examMultFor, heartbeat, GRACE_MS } from '../session.js';
 import { payFor, fineFor, payCtx } from '../economy.js';
 import { startCamera, stopCamera, cameraLive, acquireWakeLock, releaseWakeLock } from '../camera.js';
-import { startRecorder } from '../timelapse.js';
+import { startRecorder, deleteTimelapse } from '../timelapse.js';
 import { saveState } from '../store.js';
 import { showReceipt } from './receipt.js';
 import { playCash, unlockAudio } from '../sound.js';
@@ -58,6 +58,7 @@ function renderSetup(root, app) {
 }
 
 async function begin(app) {
+  if (rt) return; // double-tap guard
   unlockAudio();
   const now = app.now();
   const a = startSession({ courseId: setup.courseId, targetMin: setup.targetMin, watched: true, now });
@@ -67,7 +68,7 @@ async function begin(app) {
   if (!rt.camOK) { rt.a = { ...rt.a, watched: false }; toast('No camera — this shift is unwatched (pay ×0.8)', { ms: 4000 }); }
   else {
     rt.recorder = startRecorder(rt.a.id, rt.video, () => `${courseCode(app.state, rt.a.courseId)} · ${fmtClock(elapsedMs(rt.a, app.now()))}`,
-      { onError: () => { rt.recFailed = true; toast('Time-lapse paused (storage full)', { bad: true }); } });
+      { onError: () => { rt.recFailed = true; toast('Storage full — time-lapse stopped for this shift', { bad: true }); } });
   }
   const woke = await acquireWakeLock();
   if (!woke && !app.state.career.tipsShown.autolock) {
@@ -88,6 +89,7 @@ function persist(app, force = false) {
   const now = app.now();
   if (!force && now - rt.lastPersist < 15000) return;
   rt.lastPersist = now;
+  rt.a = heartbeat(rt.a, now);
   const st = { ...app.state, active: rt.a };
   app.commit(st, { rerender: false });
 }
@@ -101,8 +103,9 @@ function hidden(app) {
 async function shown(app) {
   if (!rt || rt.ending) return;
   rt.a = onShow(rt.a, app.now());
-  if (rt.a.status === 'failed') return end(app, 'failed');
+  if (rt.a.status === 'failed' || rt.a.status === 'completed') return end(app, 'settled');
   if (rt.camOK && !cameraLive()) await startCamera(rt.video);
+  if (!rt || rt.ending) return;
   acquireWakeLock();
   persist(app, true);
   update(app);
@@ -167,7 +170,8 @@ async function end(app, kind) {
   clearInterval(rt.timer);
   document.removeEventListener('visibilitychange', onVis);
   window.removeEventListener('pagehide', onPageHide);
-  const rec = rt.recorder ? await rt.recorder.stop() : { frames: 0 };
+  let rec = rt.recorder ? await rt.recorder.stop() : { frames: 0 };
+  if (rt.recFailed || (rt.recorder && rt.recorder.failed)) { await deleteTimelapse(a.id).catch(() => {}); rec = { frames: 0 }; } // free space; no partial time-lapse
   stopCamera(); releaseWakeLock();
   rt = null; window.__sessionHooks = null;
   const fin = finalizeSession(app.state, a, now);

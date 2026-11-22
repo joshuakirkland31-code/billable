@@ -1,7 +1,7 @@
 // Boot, routing and the single app-state holder.
 import { loadState, saveState, requestPersist } from './store.js';
 import { ensureDay, recoverActive, finalizeSession } from './session.js';
-import { purge, loadFrames, saveMeta, getMeta } from './timelapse.js';
+import { purge, loadFrames, saveMeta, getMeta, sweepOrphans } from './timelapse.js';
 import { dayKey } from './time.js';
 import { toast } from './dom.js';
 import { setSoundEnabled, unlockAudio } from './sound.js';
@@ -79,7 +79,14 @@ function onVisible() {
 }
 
 async function boot() {
-  state = await loadState();
+  try { state = await loadState(); }
+  catch {
+    // Never overwrite saved progress we couldn't read. Ask for a relaunch instead.
+    document.getElementById('tabbar').style.display = 'none';
+    const v = document.getElementById('view');
+    v.innerHTML = '<div class="card stack" style="margin-top:20vh;text-align:center"><div style="font-size:40px">🗄️</div><h2>Couldn\'t open your saved data</h2><p class="dim">Your progress is safe — nothing was changed. Close the app completely and open it again.</p><button class="btn btn-gold" onclick="location.reload()">TRY AGAIN</button></div>';
+    return;
+  }
   const demo = new URLSearchParams(location.search).get('demo');
   if (demo && location.hostname === 'localhost') state = (await import('./demo.js')).demoState(demo, app.now());
   setSoundEnabled(() => state && state.settings.sound);
@@ -93,7 +100,7 @@ async function boot() {
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   render();
   if (showRecovered) showRecovered();
-  purge(now, state.settings.capMB * 1024 * 1024);
+  sweepOrphans().then(() => purge(now, state.settings.capMB * 1024 * 1024));
   requestPersist();
   if ('serviceWorker' in navigator && location.hostname !== '127.0.0.1') {
     navigator.serviceWorker.register('sw.js').then(reg => {

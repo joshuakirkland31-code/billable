@@ -88,7 +88,8 @@ export function neededOnFinal(course) {
     })) };
     return finalGrade(copy, null);
   };
-  return bisect(f, course.target);
+  const v = bisect(f, course.target);
+  return v === null || v > 100 ? Infinity : v; // Infinity = can't reach the target on the final alone
 }
 
 const SCALE = [[90, 'A+', 12], [85, 'A', 11], [80, 'A-', 10], [77, 'B+', 9], [73, 'B', 8], [70, 'B-', 7],

@@ -90,7 +90,7 @@ export function render(root, app) {
         return h('a', { class: 'card tap', href: `#marks/${nf.id}`, style: { textDecoration: 'none', color: 'inherit' } },
           h('div', { class: 'label' }, 'Next final'),
           h('div', { class: 'between' }, h('b', null, nf.code), h('span', { class: 'mono gold' }, days === 0 ? 'TODAY' : `${days} day${days === 1 ? '' : 's'}`)),
-          h('div', { class: 'small dim' }, need === null ? `Can't reach ${nf.target}% even with 100% on the final` : need <= 0 ? `${nf.target}% is locked in` : `Need ${need.toFixed(0)}% on the final for ${nf.target}%`));
+          h('div', { class: 'small dim' }, need === null || need === Infinity ? `Can't reach ${nf.target}% even with 100% on the final` : need <= 0 ? `${nf.target}% is locked in` : `Need ${need.toFixed(0)}% on the final for ${nf.target}%`));
       })() : null,
       h('div', { class: 'card portfolio' },
         h('div', { class: 'between' }, h('span', { class: 'label' }, 'Portfolio'), h('span', { class: 'mono small dim' }, 'Term avg ' + fmtPct(avg))),

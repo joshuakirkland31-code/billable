@@ -35,7 +35,7 @@ export function render(root, app) {
       h('div', { class: 'label' }, 'Course targets'),
       h('div', { class: 'list' }, s.term.courses.map((c, i) => h('div', { class: 'li' }, h('span', null, c.code),
         h('input', { class: 'input score', type: 'number', inputmode: 'decimal', min: 0, max: 100, value: c.target, 'aria-label': `${c.code} target`,
-          onchange: e => { const v = Number(e.target.value); if (v >= 0 && v <= 100) set(st => { st.term.courses[i].target = v; }); else toast('Target must be 0–100', { bad: true }); } }))))),
+          onchange: e => { const t = e.target.value.trim(), v = Number(t); if (t !== '' && v >= 0 && v <= 100) set(st => { st.term.courses[i].target = v; }); else { e.target.value = c.target; toast('Target must be 0–100', { bad: true }); } } }))))),
     h('div', { class: 'card stack' },
       h('div', { class: 'between' }, h('span', null, 'Sounds'), h('button', { class: 'chip', 'aria-pressed': String(s.settings.sound), onclick: () => set(st => { st.settings.sound = !st.settings.sound; }) }, s.settings.sound ? 'On' : 'Off')),
       h('div', { class: 'between' }, h('span', null, 'Time-lapse storage cap'), storage),

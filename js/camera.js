@@ -50,14 +50,23 @@ export function grabFrame(videoEl, maxEdge = 360, quality = 0.6, caption = '') {
   return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', quality));
 }
 
+let pending = null;
 export async function acquireWakeLock() {
   wantWake = true;
-  try {
-    if (!('wakeLock' in navigator)) return false;
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
-    return true;
-  } catch { return false; }
+  if (wakeLock) return true;
+  if (pending) return pending;
+  if (!('wakeLock' in navigator)) return false;
+  pending = (async () => {
+    try {
+      const lock = await navigator.wakeLock.request('screen');
+      if (!wantWake) { lock.release().catch(() => {}); return false; } // released while we waited
+      wakeLock = lock;
+      lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
+      return true;
+    } catch { return false; }
+    finally { pending = null; }
+  })();
+  return pending;
 }
 
 export function releaseWakeLock() {

@@ -56,42 +56,66 @@ export function migrate(raw) {
   return s;
 }
 
+/** Stored record → state. Only a truly empty record becomes a fresh state; anything unreadable throws. */
+export function interpretStored(raw) {
+  if (raw === undefined || raw === null) return defaultState();
+  try { return migrate(raw); } catch { throw new Error('load-failed'); }
+}
+
+export function withTimeout(promise, ms) {
+  let t;
+  return Promise.race([promise, new Promise((_, rej) => { t = setTimeout(() => rej(new Error('timeout')), ms); })])
+    .finally(() => clearTimeout(t));
+}
+
 // ---- IndexedDB ----
 const DB = 'billable', STORE = 'kv', KEY = 'state';
 let dbp = null;
 function db() {
-  if (!dbp) dbp = new Promise((res, rej) => {
-    const r = indexedDB.open(DB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
+  if (!dbp) {
+    dbp = new Promise((res, rej) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+      r.onsuccess = () => {
+        const d = r.result;
+        d.onclose = () => { dbp = null; }; // iOS can drop the connection; reopen next time
+        res(d);
+      };
+      r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('blocked'));
+    });
+    dbp.catch(() => { dbp = null; }); // never cache a failed open
+  }
   return dbp;
 }
 
+/** Throws Error('load-failed') if the saved data exists but can't be read. Never returns defaults over real data. */
 export async function loadState() {
+  let raw;
   try {
-    const d = await db();
-    const raw = await new Promise((res, rej) => {
+    const d = await withTimeout(db(), 8000);
+    raw = await withTimeout(new Promise((res, rej) => {
       const q = d.transaction(STORE).objectStore(STORE).get(KEY);
       q.onsuccess = () => res(q.result);
       q.onerror = () => rej(q.error);
-    });
-    return raw ? migrate(raw) : defaultState();
+    }), 8000);
   } catch (e) {
     console.error('loadState failed', e);
-    return defaultState();
+    dbp = null;
+    throw new Error('load-failed');
   }
+  return interpretStored(raw);
 }
 
 export async function saveState(s) {
-  const d = await db();
-  await new Promise((res, rej) => {
+  const d = await withTimeout(db(), 8000);
+  await withTimeout(new Promise((res, rej) => {
     const t = d.transaction(STORE, 'readwrite');
     t.objectStore(STORE).put(s, KEY);
     t.oncomplete = res;
     t.onerror = () => rej(t.error);
-  });
+    t.onabort = () => rej(t.error || new Error('aborted'));
+  }), 8000).catch(e => { dbp = null; throw e; });
 }
 
 export async function requestPersist() {

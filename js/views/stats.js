@@ -69,14 +69,22 @@ async function openPlayer(app, rec) {
     await setStarred(rec.id, next); starred = next;
     starBtn.textContent = starred ? '★ Starred' : '☆ Keep forever';
   };
+  // Two taps: render first, then share from a fresh tap (iOS requires a recent tap for the share sheet).
+  let rendered = null;
   const saveBtn = canExportVideo() ? h('button', { class: 'btn', onclick: async () => {
+    if (rendered) {
+      try { await shareVideo(rendered); } catch (e) { if (!(e && e.name === 'AbortError')) toast('Could not open the share sheet', { bad: true }); }
+      return;
+    }
     saveBtn.disabled = true; saveBtn.textContent = 'Rendering…';
     try {
-      const f = await exportVideo(rec.id, { label: `billable-${courseName(app.state, rec.courseId)}-${dayKey(new Date(rec.startedAt))}`.replace(/\s+/g, '') });
-      if (f) await shareVideo(f); else toast('Video export isn\'t supported here', { bad: true });
-    } catch (e) { if (!(e && e.name === 'AbortError')) toast('Could not export video', { bad: true }); }
-    saveBtn.disabled = false; saveBtn.textContent = '⤓ Save to Photos';
-  } }, '⤓ Save to Photos') : null;
+      rendered = await exportVideo(rec.id, { label: `billable-${courseName(app.state, rec.courseId)}-${dayKey(new Date(rec.startedAt))}`.replace(/\s+/g, '') });
+      if (!rendered) toast('Video export isn\'t supported here', { bad: true });
+    } catch (e) { toast('Could not render the video', { bad: true }); }
+    saveBtn.disabled = false;
+    saveBtn.textContent = rendered ? '⤓ Tap to save video' : '⤓ Make video';
+    if (rendered) saveBtn.classList.add('btn-gold');
+  } }, '⤓ Make video') : null;
   const delBtn = h('button', { class: 'btn btn-red', onclick: async () => {
     await deleteTimelapse(rec.id);
     const st = JSON.parse(JSON.stringify(app.state)); const r = st.sessions.find(x => x.id === rec.id); if (r) r.hasTimelapse = false;

@@ -71,7 +71,7 @@ function renderCourse(root, app, id) {
   };
 
   const target = h('input', { class: 'input', type: 'number', inputmode: 'decimal', min: 0, max: 100, value: c.target, style: { width: '90px' },
-    onchange: e => { const v = Number(e.target.value); if (v >= 0 && v <= 100) setCourse(x => { x.target = v; }); else toast('Target must be 0–100', { bad: true }); } });
+    onchange: e => { const t = e.target.value.trim(), v = Number(t); if (t !== '' && v >= 0 && v <= 100) setCourse(x => { x.target = v; }); else { e.target.value = c.target; toast('Target must be 0–100', { bad: true }); } } });
   const finalDate = h('input', { class: 'input', type: 'date', value: c.finalDate || '', style: { maxWidth: '180px' },
     onchange: e => setCourse(x => { x.finalDate = e.target.value || null; }, 'Final date saved') });
 
@@ -110,7 +110,9 @@ function renderCourse(root, app, id) {
           h('div', { class: 'big' }, gradeText(c, r.current)),
           r.current !== null ? bar(r.current, r.current >= c.target ? 'green' : 'red') : null,
           h('div', { class: r.status === 'behind' || r.status === 'out-of-reach' ? 'red small' : 'small' }, neededText(c, r)),
-          nf !== null && r.remaining ? h('div', { class: 'small dim' }, `On the final alone (if the rest matches your current average): ${nf.toFixed(1)}%`) : null,
+          nf !== null && r.remaining && r.status !== 'out-of-reach' && r.status !== 'locked' ? h('div', { class: 'small dim' }, nf === Infinity
+            ? `The final alone can't get you to ${c.target}% unless your other remaining work beats your current average.`
+            : `On the final alone (if the rest matches your current average): ${nf.toFixed(1)}%`) : null,
           warnings.map(w => h('div', { class: 'red small' }, '⚠ ' + w)),
           h('div', { class: 'between small' }, h('span', { class: 'dim' }, 'Target %'), target),
           h('div', { class: 'between small' }, h('span', { class: 'dim' }, 'Final exam date'), finalDate),

@@ -23,8 +23,17 @@ export function onHide(a, now) {
 export function onShow(a, now) {
   if (a.hiddenAt === null) return a;
   const away = now - a.hiddenAt;
-  if (LIVE.has(a.status) && away > GRACE_MS) return { ...a, status: 'failed', endedAt: a.hiddenAt };
+  if (LIVE.has(a.status) && away > GRACE_MS) {
+    // Target already met: leaving just clocks you out at the moment you left.
+    if (tick(a, a.hiddenAt).status === 'overtime') return { ...a, status: 'completed', endedAt: a.hiddenAt };
+    return { ...a, status: 'failed', endedAt: a.hiddenAt };
+  }
   return { ...a, awayMs: a.awayMs + away, hiddenAt: null };
+}
+
+/** Record that the app was alive at `now` (used to date a session if the app is killed). */
+export function heartbeat(a, now) {
+  return { ...a, lastSeenAt: now };
 }
 
 export function elapsedMs(a, now) {
@@ -49,7 +58,9 @@ export function walkOut(a, now) {
 
 export function recoverActive(a, now) {
   if (!LIVE.has(a.status)) return a;
-  return { ...a, status: 'failed', endedAt: a.hiddenAt ?? now };
+  const end = a.hiddenAt ?? a.lastSeenAt ?? now;
+  const reached = a.status === 'overtime' || elapsedMs({ ...a, hiddenAt: null, endedAt: end }, end) >= a.targetMin * 60000;
+  return { ...a, status: reached ? 'completed' : 'failed', endedAt: end };
 }
 
 /** Course most behind its target (status 'behind'), or null. */
