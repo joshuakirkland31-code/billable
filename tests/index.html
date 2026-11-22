@@ -33,6 +33,8 @@ for (const f of files) {
   catch (e) { errors.push(`${f}: ${e.message}`); }
 }
 await run(errors);
+if (new URLSearchParams(location.search).has('report'))
+  fetch('/__result', { method: 'POST', body: document.getElementById('out').textContent });
 </script>
 </body>
 </html>
