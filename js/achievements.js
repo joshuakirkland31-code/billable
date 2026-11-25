@@ -41,7 +41,6 @@ function comeback(s) {
 }
 
 const A = (id, name, desc, check, secret = false) => ({ id, name, desc, check, secret });
-const COURSE_IDS = ['MATH137', 'CS115', 'MATH135', 'EC120', 'BU111'];
 
 export const ACHIEVEMENTS = [
   A('first_shift', 'First Shift', 'Complete your first session', s => done(s).length >= 1),
@@ -54,8 +53,6 @@ export const ACHIEVEMENTS = [
   A('early_bird', 'Early Bird', '5 sessions started before 8 am', s => count(s, x => { const h = hourOf(x); return h >= 4 && h < 8; }) >= 5),
   A('night_owl', 'Night Owl', '5 sessions started after 10 pm', s => count(s, x => { const h = hourOf(x); return h >= 22 || h < 4; }) >= 5),
   A('weekend_warrior', 'Weekend Warrior', '5 sessions on weekends', s => count(s, x => [0, 6].includes(new Date(x.startedAt).getDay())) >= 5),
-  ...COURSE_IDS.map(id => A(`course_${id}_10h`, `${id} Specialist`, `10 hours on ${id}`, s => totalMin(s, x => x.courseId === id) >= 600)),
-  ...COURSE_IDS.map(id => A(`course_${id}_25h`, `${id} Expert`, `25 hours on ${id}`, s => totalMin(s, x => x.courseId === id) >= 1500)),
   A('deans_list', "Dean's List", 'Average 80%+ across 3+ courses', deansList),
   ...[1, 5, 10].map(n => A(`beat_target_${n}`, n === 1 ? 'Above Target' : `Beat Target ×${n}`, `Beat your target on ${n} assessment${n > 1 ? 's' : ''}`, s => Object.keys(s.career.beatMarks || {}).length >= n)),
   A('comeback', 'Comeback', 'Score higher on a final than the midterm', comeback),
@@ -80,20 +77,50 @@ export const ACHIEVEMENTS = [
     return Object.values(by).some(v => v.size >= 3);
   }, true),
   A('walked_out', 'Walked Out', 'Walk out of a session (it happens)', s => s.sessions.some(x => x.status !== 'completed'), true),
-  A('full_house', 'Full House', 'Study all 5 courses in one week', s => {
+  A('full_house', 'Full House', 'Study every course in one week', s => {
     const by = {};
     for (const x of done(s)) { const w = weekKey(dayKey(new Date(x.startedAt))); (by[w] = by[w] || new Set()).add(x.courseId); }
-    return Object.values(by).some(v => COURSE_IDS.every(id => v.has(id)));
+    const ids = s.term.courses.map(c => c.id);
+    return ids.length > 0 && Object.values(by).some(v => ids.every(id => v.has(id)));
   }, true),
+  A('first_step', 'First Step', 'Tick off a goal step', s => (s.career.stepsTicked || 0) >= 1),
+  A('steps_25', 'Momentum', 'Tick off 25 goal steps', s => (s.career.stepsTicked || 0) >= 25),
+  A('steps_100', 'Unstoppable', 'Tick off 100 goal steps', s => (s.career.stepsTicked || 0) >= 100),
+  A('first_goal', 'Goal Getter', 'Complete a goal', s => { const g = s.career.goalsDone || {}; return (g.short || 0) + (g.medium || 0) + (g.long || 0) >= 1; }),
+  A('goal_long', 'The Long Game', 'Complete a long-term goal', s => ((s.career.goalsDone || {}).long || 0) >= 1),
+  A('goal_hit_10', 'On Target', 'Reach your session goal 10 times', s => done(s).filter(x => x.goalMin && x.minutes >= x.goalMin).length >= 10),
+  A('contracts_perfect_7', 'Perfect Week of Contracts', 'Close every contract on 7 days', s => (s.career.perfectContractDays || 0) >= 7),
 ];
 
-export const achievementById = id => ACHIEVEMENTS.find(a => a.id === id);
+function courseAchievements(state) {
+  const courses = [...(state.term ? state.term.courses : []), ...(state.pastTerms || []).flatMap(t => t.courses || [])];
+  const seen = new Set();
+  return courses.filter(c => !seen.has(c.id) && seen.add(c.id)).flatMap(c => [
+    A(`course_${c.id}_10h`, `${c.code || c.id} Specialist`, `10 hours on ${c.code || c.id}`, s => totalMin(s, x => x.courseId === c.id) >= 600),
+    A(`course_${c.id}_25h`, `${c.code || c.id} Expert`, `25 hours on ${c.code || c.id}`, s => totalMin(s, x => x.courseId === c.id) >= 1500),
+  ]);
+}
+
+/** Every achievement that applies to this save: the base list plus one pair per course you've taken. */
+export function achievementsFor(state) {
+  return [...ACHIEVEMENTS, ...courseAchievements(state)];
+}
+
+export const achievementById = (id, state = null) => {
+  const a = ACHIEVEMENTS.find(x => x.id === id);
+  if (a) return a;
+  const m = /^course_(.+)_(10|25)h$/.exec(id);
+  if (!m) return null;
+  const course = state && [...state.term.courses, ...(state.pastTerms || []).flatMap(t => t.courses || [])].find(c => c.id === m[1]);
+  const code = course ? course.code : m[1];
+  return { id, name: `${code} ${m[2] === '10' ? 'Specialist' : 'Expert'}`, desc: `${m[2]} hours on ${code}`, secret: false };
+};
 
 /** Grants every newly met achievement (and its reward item). Pure. */
 export function evaluateAchievements(state, now) {
   const s = JSON.parse(JSON.stringify(state));
   const newly = [];
-  for (const a of ACHIEVEMENTS) {
+  for (const a of achievementsFor(s)) {
     if (s.career.achievements[a.id]) continue;
     let ok = false;
     try { ok = a.check(s); } catch { ok = false; }
