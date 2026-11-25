@@ -35,7 +35,7 @@ export function render(root, app, params) {
     h('div', { class: 'topbar' }, h('h1', null, 'Marks'), h('span', { class: 'mono gold' }, 'Avg ' + fmtPct(avg))),
     s.term.courses.map(c => {
       const r = computeCourse(c);
-      return h('a', { class: 'card tap stack', href: '#marks/' + c.id, style: { textDecoration: 'none', color: 'inherit' } },
+      return h('a', { class: 'card tap stack', href: '#school/' + c.id, style: { textDecoration: 'none', color: 'inherit' } },
         h('div', { class: 'between' }, h('div', null, h('b', null, c.code), h('div', { class: 'small dim' }, c.name)), statusChip(r, c)),
         h('div', { class: 'between mono' }, h('span', { class: 'big', style: { fontSize: '26px' } }, gradeText(c, r.current)), h('span', { class: 'small dim' }, `target ${c.target}%`)),
         r.current !== null ? bar(r.current, r.current >= c.target ? 'green' : 'red') : null,
@@ -46,7 +46,7 @@ export function render(root, app, params) {
 function renderCourse(root, app, id) {
   const s = app.state;
   const c = s.term.courses.find(x => x.id === id);
-  if (!c) { root.append(h('p', null, 'Course not found. ', h('a', { href: '#marks' }, 'Back'))); return; }
+  if (!c) { root.append(h('p', null, 'Course not found. ', h('a', { href: '#school' }, 'Back'))); return; }
   const r = computeCourse(c);
   const warnings = passWarnings(c);
   const nf = neededOnFinal(c);
@@ -97,7 +97,7 @@ function renderCourse(root, app, id) {
   const weightSum = c.components.reduce((a, x) => a + x.weight, 0);
 
   root.append(h('div', { class: 'stack' },
-    h('div', { class: 'topbar' }, h('a', { class: 'icon-btn', href: '#marks', 'aria-label': 'Back' }, '‹'),
+    h('div', { class: 'topbar' }, h('a', { class: 'icon-btn', href: '#school', 'aria-label': 'Back' }, '‹'),
       h('div', { class: 'center' }, h('b', null, c.code), h('div', { class: 'small dim' }, c.name)),
       h('button', { class: 'icon-btn', 'aria-label': isEditing ? 'Done editing' : 'Edit', onclick: () => {
         if (isEditing && Math.abs(weightSum - 100) > 0.001) { toast(`Weights add to ${weightSum}%, they need to add to 100%`, { bad: true }); return; }

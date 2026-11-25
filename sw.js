@@ -1,13 +1,13 @@
 // Offline app shell. Bump CACHE on every release. Never touches IndexedDB (your data).
-const CACHE = 'billable-v2';
+const CACHE = 'billable-v3';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
-  './js/app.js', './js/achievements.js', './js/backup.js', './js/camera.js', './js/contracts.js', './js/courses-data.js',
+  './js/app.js', './js/achievements.js', './js/backup.js', './js/wakelock.js', './js/contracts.js', './js/courses-data.js', './js/goals.js',
   './js/demo.js', './js/dom.js', './js/economy.js', './js/grades.js', './js/items.js', './js/marks.js', './js/office.js',
-  './js/review.js', './js/session.js', './js/sound.js', './js/store.js', './js/streak.js', './js/time.js', './js/timelapse.js',
+  './js/review.js', './js/session.js', './js/sound.js', './js/store.js', './js/streak.js', './js/time.js',
   './js/views/home.js', './js/views/marks.js', './js/views/office.js', './js/views/receipt.js', './js/views/session.js',
-  './js/views/settings.js', './js/views/stats.js',
+  './js/views/settings.js', './js/views/stats.js', './js/views/goals.js', './js/views/plan.js',
 ];
 
 self.addEventListener('install', e => {

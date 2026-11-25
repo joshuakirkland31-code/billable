@@ -3,6 +3,7 @@ import { defaultState } from './store.js';
 import { RANK_THRESHOLDS } from './economy.js';
 import { evaluateAchievements } from './achievements.js';
 import { ensureDay } from './session.js';
+import { migrateWhy, createGoal, addStep, tickStep } from './goals.js';
 
 export function demoState(kind, now) {
   let s = defaultState();
@@ -29,6 +30,13 @@ export function demoState(kind, now) {
   s.career.cash = kind === 'rich' ? 900000 : 12400;
   s.career.owned = { desk_basic: true, pc_laptop: true, acc_mug: true };
   s.career.equipped = { desk: 'desk_basic', computer: 'pc_laptop', deskAcc: 'acc_mug' };
+  s.goals = migrateWhy(['Make money', 'Get a good job', 'Be happy with my grades'], now - 30 * 86400000);
+  const old = now - 2 * 86400000;
+  let g = createGoal(s, { title: 'Prep for EC120 final', tier: 'short', courseId: 'EC120', due: '2026-12-15' }, old); s = g.state;
+  for (const t of ['Redo Review Quiz 2 mistakes', 'Chapter 14–16 practice set', 'Make the formula sheet', 'Full practice exam']) s = addStep(s, g.goal.id, t, old).state;
+  s = tickStep(s, g.goal.id, s.goals.find(x => x.id === g.goal.id).steps[0].id, true, old + 3600000).state;
+  g = createGoal(s, { title: 'Finish Fall 2026 with an 80% average', tier: 'medium' }, old); s = g.state;
+  for (const t of ['Book office hours for MATH 135', 'Finish CS 115 A5']) s = addStep(s, g.goal.id, t, old).state;
   s = evaluateAchievements(s, now).state;
   return ensureDay(s, now);
 }

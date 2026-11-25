@@ -1,16 +1,23 @@
 // Shared payout receipt, promotion card and achievement list.
 import { h, money, fmtMin, openSheet } from '../dom.js';
 import { achievementById } from '../achievements.js';
-import { contractLabel } from '../contracts.js';
+import { contractText } from '../contracts.js';
 import { ITEMS } from '../items.js';
-import { playCash, playPromo, playFail } from '../sound.js';
+import { playCash, playPromo } from '../sound.js';
 
-export function achievementList(ids) {
+const END_TEXT = {
+  clockout: null,
+  left: 'Ended when you left the app.',
+  idle: 'Ended at your last tap (no answer to "Still studying?").',
+  recovered: 'The app closed — saved up to when it was last open.',
+};
+
+export function achievementList(ids, state = null) {
   if (!ids || !ids.length) return null;
   return h('div', { class: 'card gold-edge stack' },
     h('div', { class: 'label' }, 'Achievements unlocked'),
     ids.map(id => {
-      const a = achievementById(id);
+      const a = achievementById(id, state);
       const reward = ITEMS.find(i => i.achievement === id);
       return h('div', null, h('b', { class: 'gold' }, '🏆 ', a ? a.name : id),
         h('div', { class: 'small dim' }, a ? a.desc : '', reward ? ` · Unlocked ${reward.art} ${reward.name}` : ''));
@@ -30,29 +37,41 @@ export function showPromotion(rank) {
   });
 }
 
-/** Shows the session receipt. courseCode for labels. Returns when closed. */
-export function showReceipt(receipt, { courseCode = '', recovered = false } = {}) {
-  const ok = receipt.status === 'completed';
-  if (ok) playCash(); else playFail();
-  const title = ok ? 'Shift complete' : recovered ? 'You left the office' : receipt.status === 'failed' ? 'You left the office' : 'Walked out';
-  const sub = ok ? `${fmtMin(receipt.minutes)} billed${courseCode ? ' to ' + courseCode : ''}`
-    : recovered ? 'The app was closed mid-session, so it counts as leaving.'
-    : receipt.status === 'failed' ? 'You were away for more than 10 seconds.' : 'You clocked out before your target.';
+/** Shows the session receipt. Returns when closed (and after any promotion card). */
+export function showReceipt(receipt, { app = null, courseCode = '' } = {}) {
+  const state = app && app.state;
+  if (receipt.discarded) {
+    return new Promise(res => {
+      const close = openSheet(h('div', { class: 'stack center' },
+        h('div', { style: { fontSize: '40px' } }, '⏱'),
+        h('h2', null, 'Not saved'),
+        h('p', { class: 'dim' }, `That session was ${fmtMin(receipt.minutes)} — under 5 minutes isn't saved.`),
+        h('button', { class: 'btn btn-gold btn-block', onclick: () => close() }, 'OK')), { center: true, onClose: res });
+    });
+  }
+  playCash();
+  const step = receipt.stepId && state && state.goals.flatMap(g => g.steps.map(st => ({ g, st }))).find(x => x.st.id === receipt.stepId);
+  const stepBtn = step && !step.st.done ? h('button', { class: 'btn btn-block', onclick: async () => {
+    stepBtn.disabled = true; stepBtn.textContent = '✓ Step marked done';
+    const { tickAndToast } = await import('./goals.js');
+    await tickAndToast(app, step.g.id, step.st.id, true);
+  } }, `☐  Mark "${step.st.text}" done`) : null;
   return new Promise(res => {
     const close = openSheet(h('div', { class: 'stack' },
       h('div', { class: 'center' },
-        h('div', { style: { fontSize: '44px' } }, ok ? '💰' : '🚪'),
-        h('h2', null, title), h('div', { class: 'dim small' }, sub)),
+        h('div', { style: { fontSize: '44px' } }, receipt.goalHit ? '🎯' : '💰'),
+        h('h2', null, receipt.goalHit ? 'Goal hit — shift complete' : 'Shift complete'),
+        h('div', { class: 'dim small' }, `${fmtMin(receipt.minutes)} billed${courseCode ? ' to ' + courseCode : ''}`),
+        END_TEXT[receipt.endReason] ? h('div', { class: 'small gold', style: { marginTop: '4px' } }, END_TEXT[receipt.endReason]) : null),
       h('div', { class: 'card' },
-        ok ? h('div', { class: 'receipt-line' }, h('span', null, 'Salary'), h('b', { class: 'gold' }, '+' + money(receipt.earned))) : null,
+        h('div', { class: 'receipt-line' }, h('span', null, 'Salary'), h('b', { class: 'gold' }, '+' + money(receipt.earned))),
         (receipt.bonuses || []).map(b => h('div', { class: 'receipt-line small dim' }, h('span', null, b), h('span', null, '✓'))),
         receipt.contractCash ? h('div', { class: 'receipt-line' }, h('span', null, 'Contracts'), h('b', { class: 'green' }, '+' + money(receipt.contractCash))) : null,
-        (receipt.contractsDone || []).map(id => h('div', { class: 'receipt-line small dim' }, h('span', null, '✔ ' + contractLabel(id)), h('span'))),
-        receipt.fine ? h('div', { class: 'receipt-line' }, h('span', null, 'Fine (10%)'), h('b', { class: 'red' }, '−' + money(receipt.fine))) : null,
-        ok && receipt.streakExtended ? h('div', { class: 'receipt-line' }, h('span', null, 'Streak'), h('b', null, '🔥 extended')) : null,
-        !ok ? h('div', { class: 'receipt-line small dim' }, h('span', null, 'No pay, no streak credit'), h('span')) : null),
-      achievementList(receipt.newAchievements),
-      h('button', { class: 'btn btn-gold btn-block', onclick: () => close() }, ok ? 'COLLECT' : 'BACK TO WORK')),
+        state ? (receipt.contractsDone || []).filter(k => k.startsWith('rand:')).map(k => h('div', { class: 'receipt-line small dim' }, h('span', null, '✔ ' + contractText({ kind: 'random', ref: k.slice(5) }, state)), h('span'))) : null,
+        receipt.streakExtended ? h('div', { class: 'receipt-line' }, h('span', null, 'Streak'), h('b', null, '🔥 extended')) : null),
+      achievementList(receipt.newAchievements, state),
+      stepBtn,
+      h('button', { class: 'btn btn-gold btn-block', onclick: () => close() }, 'COLLECT')),
     { center: true, onClose: async () => { if (receipt.promotedTo) await showPromotion(receipt.promotedTo); res(); } });
   });
 }
