@@ -105,7 +105,10 @@ export function evaluateDailyContracts(state, day) {
   const c = s.career;
   const out = { state: s, newly: [], cash: 0 };
   if (c.contracts.day !== day) return out;
-  const todays = s.sessions.filter(x => dayKey(new Date(x.startedAt)) === day);
+  // A session counts for the day it started and the day it ended (sessions can cross 4 am).
+  const todays = s.sessions.filter(x => dayKey(new Date(x.startedAt)) === day || dayKey(new Date(x.endedAt ?? x.startedAt)) === day);
+  // Steps deleted since the list was made can never be done: drop their contracts.
+  c.contracts.items = c.contracts.items.filter(it => it.kind !== 'step' || it.done || findGoalStep(s, it.ref.goalId, it.ref.stepId));
   const rate = rateFor(rankIndex(c.xp), c.prestige);
   for (const it of c.contracts.items) {
     if (it.done) continue;

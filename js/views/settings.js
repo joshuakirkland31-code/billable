@@ -41,7 +41,7 @@ export function render(root, app) {
           const ok = await shareBackup(app.state);
           if (ok) { set(st => { st.career.lastBackup = app.now(); }); toast('Backup saved'); }
         } }, '💾 BACK UP'),
-        h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Restore…')),
+        h('button', { class: 'btn', onclick: () => { if (app.state.active) { toast('Clock out of your session before restoring a backup', { bad: true }); return; } fileIn.click(); } }, 'Restore…')),
       fileIn),
     h('div', { class: 'card stack' },
       h('div', { class: 'label' }, 'Danger zone'),

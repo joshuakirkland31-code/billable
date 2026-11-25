@@ -49,7 +49,7 @@ export const ACHIEVEMENTS = [
   ...[10, 50, 100, 250].map(n => A(`sessions_${n}`, `${n} Sessions`, `Complete ${n} sessions`, s => done(s).length >= n)),
   A('deep_90', 'Marathon', 'One session of 90+ minutes', s => done(s).some(x => x.minutes >= 90)),
   A('deep_50_x10', 'Deep Worker', '10 sessions of 50+ minutes', s => count(s, x => x.minutes >= 50) >= 10),
-  A('overtime_30', 'Overtime', 'Go 30+ minutes past your target', s => done(s).some(x => x.minutes >= x.targetMin + 30)),
+  A('overtime_30', 'Overtime', 'Go 30+ minutes past your session goal', s => done(s).some(x => { const g = x.goalMin ?? x.targetMin; return g && x.minutes >= g + 30; })),
   A('early_bird', 'Early Bird', '5 sessions started before 8 am', s => count(s, x => { const h = hourOf(x); return h >= 4 && h < 8; }) >= 5),
   A('night_owl', 'Night Owl', '5 sessions started after 10 pm', s => count(s, x => { const h = hourOf(x); return h >= 22 || h < 4; }) >= 5),
   A('weekend_warrior', 'Weekend Warrior', '5 sessions on weekends', s => count(s, x => [0, 6].includes(new Date(x.startedAt).getDay())) >= 5),

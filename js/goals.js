@@ -9,6 +9,7 @@ export const GOAL_REWARD_MIN = { short: 60, medium: 180, long: 600 };
 export const STEP_REWARD_MIN = 15;
 export const STEP_DAILY_PAY_CAP = 10;
 export const STEP_MIN_AGE_MS = 3600000;
+export const GOAL_DAILY_PAY_CAP = 2;
 
 let seq = 0;
 export const uid = (p, now) => p + now.toString(36) + (seq++).toString(36) + Math.floor(Math.random() * 1e4).toString(36);
@@ -120,13 +121,35 @@ export function canComplete(goal) {
   return goal.steps.length >= 2 && goal.steps.every(x => x.done);
 }
 
-/** Complete a goal: pays 60/180/600 min of cash once, only with >= 2 steps, all done. */
-export function completeGoal(state, goalId, now) {
+/** Each step was finished at least an hour after it was added (stops instant goal farming). */
+export function stepsMatured(goal) {
+  return goal.steps.every(x => x.done && x.doneAt - x.createdAt >= STEP_MIN_AGE_MS);
+}
+
+/**
+ * Complete a goal: pays 60/180/600 min of cash once, only with >= 2 steps, all done, each done >= 1 h after it was added,
+ * and at most 2 paid completions per day. Returns reason 'too-new' / 'cap' without completing unless { force: true }
+ * (force completes it with no bonus).
+ */
+export function completeGoal(state, goalId, now, { force = false } = {}) {
   let s = clone(state);
   const g = findGoal(s, goalId);
   const receipt = { paid: 0, reason: 'ok', newAchievements: [] };
-  if (g.paid) { receipt.reason = 'already'; return { state: s, receipt }; }
+  if (g.paid || g.doneAt) { receipt.reason = 'already'; return { state: s, receipt }; }
   if (!canComplete(g)) { receipt.reason = 'needs-steps'; return { state: s, receipt }; }
+  const c = s.career;
+  const day = dayKey(new Date(now));
+  if (!c.goalPay || c.goalPay.day !== day) c.goalPay = { day, count: 0 };
+  const blocked = !stepsMatured(g) ? 'too-new' : c.goalPay.count >= GOAL_DAILY_PAY_CAP ? 'cap' : null;
+  if (blocked) {
+    receipt.reason = blocked;
+    if (!force) return { state: s, receipt };
+    g.doneAt = now;
+    const ach = evaluateAchievements(s, now);
+    s = ach.state; receipt.newAchievements = ach.newly;
+    return { state: s, receipt };
+  }
+  c.goalPay.count += 1;
   g.paid = true; g.doneAt = now;
   receipt.paid = Math.round(GOAL_REWARD_MIN[g.tier] * rate(s));
   s.career.cash += receipt.paid;

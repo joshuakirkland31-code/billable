@@ -87,17 +87,24 @@ export function examMultFor(state, courseId, now) {
   return upcoming.length && upcoming[0].id === courseId ? 2 : 1.5;
 }
 
-/** Settle a finished session into state. Pure. */
+/** A session record we can settle: has an id, a start time and a finished status. */
+function settleable(a) {
+  return !!a && typeof a === 'object' && typeof a.id === 'string' && Number.isFinite(a.startedAt) && a.status === 'completed';
+}
+
+/** Settle a finished session into state. Pure. Anything malformed is ignored (state unchanged, receipt.discarded). */
 export function finalizeSession(state, a, now, evaluate = evaluateAchievements) {
-  const minutes = Math.floor(elapsedMs(a, now) / 60000);
+  const ok = settleable(a);
+  const minutes = ok ? Math.floor(elapsedMs(a, now) / 60000) : 0;
   const receipt = { discarded: false, minutes, earned: 0, bonuses: [], goalHit: false, promotedTo: null, streakExtended: false,
-    contractsDone: [], contractCash: 0, newAchievements: [], endReason: a.endReason || 'clockout', stepId: a.stepId || null };
-  if (minutes < MIN_SAVE_MIN) {
-    const s = clone(state); s.active = null;
+    contractsDone: [], contractCash: 0, newAchievements: [], endReason: (a && a.endReason) || 'clockout', stepId: (a && a.stepId) || null };
+  if (!ok || minutes < MIN_SAVE_MIN) {
+    const s = clone(state);
+    if (ok) s.active = null; // a real but too-short session ends; a malformed one never touches state
     receipt.discarded = true;
     return { state: s, receipt };
   }
-  let s = ensureDay(state, a.endedAt ?? now);
+  let s = clone(state);
   const c = s.career;
   const startDay = dayKey(new Date(a.startedAt));
   const goalHit = !!a.goalMin && minutes >= a.goalMin;
@@ -111,6 +118,8 @@ export function finalizeSession(state, a, now, evaluate = evaluateAchievements) 
   if (goalHit) receipt.bonuses.push('Goal hit +10%');
   if (ctx.examMult > 1) receipt.bonuses.push(`Exam season ×${ctx.examMult}`);
   c.xp += earned; c.lifetime += earned; c.cash += earned;
+  // Streak is credited to the day the session started (roll over only up to that day first).
+  c.streak = rolloverStreak(c.streak, startDay);
   const r = applySessionToStreak(c.streak, startDay, minutes, true);
   c.streak = r.streak; receipt.streakExtended = r.extended;
 
@@ -119,11 +128,18 @@ export function finalizeSession(state, a, now, evaluate = evaluateAchievements) 
     minutes, status: 'completed', earned, fine: 0 });
   s.active = null;
 
-  // Contracts (today's)
-  const ev = evaluateDailyContracts(s, dayKey(new Date(now)));
-  s = ev.state;
-  receipt.contractsDone = ev.newly; receipt.contractCash = ev.cash;
-  if (s.career.contracts.allPaid && !c.contracts.allPaid) receipt.bonuses.push('All contracts closed');
+  // Contracts: first the list that was showing (may be the day before 4 am), then today's if the day rolled over.
+  const allPaidBefore = c.contracts.allPaid;
+  const absorb = ev => {
+    s = ev.state;
+    receipt.contractsDone.push(...ev.newly); receipt.contractCash += ev.cash;
+  };
+  if (c.contracts.day) absorb(evaluateDailyContracts(s, c.contracts.day));
+  const endDay = dayKey(new Date(a.endedAt ?? now));
+  const before = s.career.contracts.day;
+  s = ensureDay(s, a.endedAt ?? now);
+  if (s.career.contracts.day !== before) absorb(evaluateDailyContracts(s, endDay));
+  if (s.career.contracts.allPaid && (!allPaidBefore || s.career.contracts.day !== before)) receipt.bonuses.push('All contracts closed');
 
   const rankAfter = rankIndex(s.career.xp);
   if (rankAfter > rankBefore) receipt.promotedTo = RANKS[rankAfter].name;

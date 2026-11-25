@@ -13,12 +13,14 @@ const showDone = { open: false };
 /** Tick/untick a step from anywhere, settle today's contracts, and tell the user what happened. */
 export async function tickAndToast(app, goalId, stepId, done) {
   const now = app.now();
-  const r = tickStep(app.state, goalId, stepId, done, now);
+  let r;
+  try { r = tickStep(app.state, goalId, stepId, done, now); }
+  catch { toast('That step was deleted', { bad: true }); await app.commit(evaluateDailyContracts(app.state, dayKey(new Date(now))).state); return; }
   const ev = evaluateDailyContracts(r.state, dayKey(new Date(now)));
   await app.commit(ev.state);
   const { reason, paid, newAchievements } = r.receipt;
   if (reason === 'ok') { playCash(); toast(`✔ Step done  +${money(paid + ev.cash)}`); }
-  else if (reason === 'too-new') toast('Done ✔ — steps pay once they\'ve been on your list for an hour', { ms: 3500 });
+  else if (reason === 'too-new') toast('Done ✔ — no pay: steps only pay if they\'ve been on your list for an hour', { ms: 3500 });
   else if (reason === 'cap') toast('Done ✔ — daily step pay limit reached (10)', { ms: 3500 });
   else if (reason === 'already') toast('Done ✔ (already paid)');
   else if (ev.cash) { playCash(); toast(`+${money(ev.cash)} contracts`); }
@@ -114,7 +116,7 @@ function renderGoal(root, app, id) {
           : h('button', { class: 'chip', onclick: async () => {
               const r = addStepToToday(app.state, g.id, st.id, day);
               await app.commit(r.state);
-              toast(r.added ? 'Added to today\'s contracts' : 'Today\'s contracts are full (5) — it\'ll be first tomorrow');
+              toast(r.added ? 'Added to today\'s contracts' : 'Today\'s contracts are full — it stays on your goal list');
             } }, '+ Today')) : null,
         h('div', { class: 'row', style: { gap: '2px' } },
           h('button', { class: 'icon-btn mini', 'aria-label': 'Move up', disabled: i === 0, onclick: () => set(moveStep(app.state, g.id, st.id, -1)) }, '↑'),
@@ -123,9 +125,17 @@ function renderGoal(root, app, id) {
         : h('div', { class: 'small dim' }, 'No steps yet. Small, concrete steps work best.'),
       h('div', { class: 'row' }, h('div', { class: 'grow' }, newStep), h('button', { class: 'btn btn-gold', onclick: add }, 'ADD'))),
     g.doneAt
-      ? h('div', { class: 'card gold-edge center' }, '🏁 Completed ', fmtDate(dayKey(new Date(g.doneAt))))
+      ? h('div', { class: 'card gold-edge center' }, '🏁 Completed ', fmtDate(dayKey(new Date(g.doneAt))), g.paid ? '' : ' (no bonus)')
       : h('button', { class: 'btn btn-block ' + (ready ? 'btn-gold' : ''), disabled: !ready, onclick: async () => {
-          const r = completeGoal(app.state, g.id, app.now());
+          let r = completeGoal(app.state, g.id, app.now());
+          if (r.receipt.reason === 'too-new' || r.receipt.reason === 'cap') {
+            const why = r.receipt.reason === 'too-new'
+              ? 'The bonus needs every step finished at least an hour after you added it.'
+              : 'You\'ve already been paid for 2 goals today. Come back tomorrow for the bonus.';
+            const ok = await confirmSheet('No bonus for this one', why + ' Complete it anyway without the bonus?', 'Complete anyway');
+            if (!ok) return;
+            r = completeGoal(app.state, g.id, app.now(), { force: true });
+          }
           await app.commit(r.state);
           if (r.receipt.reason === 'ok') { playCash(); toast(`🏁 Goal complete  +${money(r.receipt.paid)}`); }
           for (const a of r.receipt.newAchievements) { const x = achievementById(a, app.state); toast(`🏆 ${x ? x.name : a}`); }

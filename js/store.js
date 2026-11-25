@@ -12,7 +12,7 @@ export function defaultCareer() {
     owned: {}, equipped: {}, achievements: {},
     contracts: { day: null, items: [], allPaid: false },
     contractsCompleted: 0, perfectContractDays: 0,
-    stepPay: { day: null, count: 0 }, todaySteps: {}, stepsTicked: 0,
+    stepPay: { day: null, count: 0 }, goalPay: { day: null, count: 0 }, todaySteps: {}, stepsTicked: 0,
     goalsDone: { short: 0, medium: 0, long: 0 },
     lastReviewWeek: null, lastBackup: null, filedMarks: {}, beatMarks: {},
     tipsShown: {},

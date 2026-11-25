@@ -58,6 +58,7 @@ export const app = {
     if (ms < MIN_SAVE_MIN * 60000) {
       const ok = await confirmSheet('Clock out?', `Sessions under ${MIN_SAVE_MIN} minutes aren't saved. Clock out anyway?`, 'Clock out');
       if (!ok) return;
+      if (!state.active || state.active.id !== a.id) return; // it already ended while the question was open
     }
     settle(clockOut(state.active, app.now()));
   },
@@ -155,7 +156,7 @@ function shown() {
 
 let settling = false;
 async function settle(a) {
-  if (settling) return;
+  if (settling || !a || !state.active || state.active.id !== a.id) return;
   settling = true;
   releaseWakeLock();
   const now = app.now();
