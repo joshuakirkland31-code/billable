@@ -34,8 +34,18 @@ export function daysBetween(a, b) {
   return Math.round((parseKey(b) - parseKey(a)) / 86400000);
 }
 
-export function isExamSeason(date = new Date()) {
-  return date.getFullYear() === 2026 && date.getMonth() === 11 && date.getDate() <= 23;
+/** Exam season = the 23 days ending at the current term's latest final (fallback Dec 1-23, 2026). */
+export function examSeasonRange(state) {
+  const finals = ((state && state.term && state.term.courses) || []).map(c => c.finalDate).filter(Boolean).sort();
+  if (!finals.length) return { start: '2026-12-01', end: '2026-12-23' };
+  const end = finals[finals.length - 1];
+  return { start: addDays(end, -22), end };
+}
+
+export function isExamSeason(date = new Date(), state = null) {
+  const { start, end } = examSeasonRange(state);
+  const k = keyOf(date); // calendar date
+  return k >= start && k <= end;
 }
 
 export function todayKey() { return dayKey(new Date()); }

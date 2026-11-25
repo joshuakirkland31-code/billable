@@ -24,6 +24,8 @@ describe('economy', () => {
       .toBe(Math.round(90 * 10 * 1.5 * 1.25 * 1.5 * 0.8));
     expect(payFor(10, { ...base, prestige: 1 })).toBe(110);
     expect(payFor(0, base)).toBe(0);
+    expect(payFor(50, { ...base, goalHit: true })).toBe(600);
+    expect(payFor(90, { ...base, goalHit: true })).toBe(Math.round(90 * 10 * 1.35));
   });
   it('streak multiplier caps at 2', () => {
     expect(streakMultiplier(0)).toBe(1);

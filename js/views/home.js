@@ -83,7 +83,7 @@ export function render(root, app) {
           const d = c.contracts.done.includes(id);
           return h('div', { class: 'li small' }, h('span', { class: d ? 'dim' : '' }, (d ? '✔ ' : '○ ') + contractLabel(id, {}, behindCode)), d ? h('span', { class: 'green mono' }, 'PAID') : null);
         }))),
-      isExamSeason(new Date(now)) ? h('div', { class: 'card gold-edge small' }, h('b', { class: 'gold' }, 'EXAM SEASON '), 'All study pays ×1.5; your next final\'s course pays ×2.') : null,
+      isExamSeason(new Date(now), s) ? h('div', { class: 'card gold-edge small' }, h('b', { class: 'gold' }, 'EXAM SEASON '), 'All study pays ×1.5; your next final\'s course pays ×2.') : null,
       nf ? (() => {
         const need = neededOnFinal(nf);
         const days = daysBetween(today, nf.finalDate);

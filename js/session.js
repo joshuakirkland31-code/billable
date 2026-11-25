@@ -87,7 +87,7 @@ export function ensureDay(state, now) {
 
 export function examMultFor(state, courseId, now) {
   const d = new Date(now);
-  if (!isExamSeason(d)) return 1;
+  if (!isExamSeason(d, state)) return 1;
   const today = dayKey(d);
   const upcoming = state.term.courses.filter(c => c.finalDate && c.finalDate >= today)
     .sort((a, b) => a.finalDate.localeCompare(b.finalDate));

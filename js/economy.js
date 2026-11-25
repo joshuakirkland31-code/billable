@@ -41,11 +41,13 @@ export function lengthBonus(minutes) {
   return minutes >= 90 ? 0.25 : minutes >= 50 ? 0.10 : 0;
 }
 
-/** ctx = { rankIdx, prestige, streakCount, unwatched, examMult } */
+export const GOAL_BONUS = 0.10;
+
+/** ctx = { rankIdx, prestige, streakCount, examMult, goalHit } */
 export function payFor(minutes, ctx) {
   if (!(minutes > 0)) return 0;
   const rate = rateFor(ctx.rankIdx, ctx.prestige || 0);
-  return Math.round(minutes * rate * streakMultiplier(ctx.streakCount || 0) * (1 + lengthBonus(minutes))
+  return Math.round(minutes * rate * streakMultiplier(ctx.streakCount || 0) * (1 + lengthBonus(minutes) + (ctx.goalHit ? GOAL_BONUS : 0))
     * (ctx.examMult || 1) * (ctx.unwatched ? 0.8 : 1));
 }
 
@@ -83,6 +85,6 @@ export function progressToNext(xp, prestige = 0) {
 }
 
 /** Context for pay/fine from state. examMult supplied by caller. */
-export function payCtx(career, { unwatched = false, examMult = 1 } = {}) {
-  return { rankIdx: rankIndex(career.xp), prestige: career.prestige || 0, streakCount: career.streak.count, unwatched, examMult };
+export function payCtx(career, { unwatched = false, examMult = 1, goalHit = false } = {}) {
+  return { rankIdx: rankIndex(career.xp), prestige: career.prestige || 0, streakCount: career.streak.count, unwatched, examMult, goalHit };
 }

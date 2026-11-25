@@ -33,7 +33,7 @@ describe('review fixes', () => {
     expect(r.endedAt).toBe(T0 + 5 * MIN);
   });
   it('C1: stored data is never replaced by defaults when it cannot be read', () => {
-    expect(interpretStored(undefined).schema).toBe(1);
+    expect(interpretStored(undefined).schema).toBe(2);
     const s = defaultState(); s.career.cash = 5;
     expect(interpretStored(JSON.parse(JSON.stringify(s))).career.cash).toBe(5);
     expect(() => interpretStored({ schema: 99 })).toThrow('load-failed');
