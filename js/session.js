@@ -1,9 +1,8 @@
 // Stopwatch study session state machine (pure) and the payout that ends it.
 import { dayKey, isExamSeason } from './time.js';
-import { RANKS, rankIndex, rateFor, payFor, payCtx } from './economy.js';
+import { RANKS, rankIndex, payFor, payCtx } from './economy.js';
 import { rolloverStreak, applySessionToStreak } from './streak.js';
-import { dailyContracts, evaluateContracts, byId, ALL_DONE_BONUS_MIN } from './contracts.js';
-import { computeCourse } from './grades.js';
+import { buildDailyContracts, evaluateDailyContracts, behindCourse } from './contracts.js';
 import { evaluateAchievements } from './achievements.js';
 
 export const GRACE_MS = 10000;          // leave the app longer than this and the session ends
@@ -66,24 +65,15 @@ export function recoverActive(a, now) {
   return { ...a, status: 'completed', endedAt: a.hiddenAt ?? a.lastSeenAt ?? now, endReason: 'recovered' };
 }
 
-/** Course most behind its target (status 'behind'), or null. */
-export function behindCourse(state) {
-  let best = null, gap = 0;
-  for (const c of state.term.courses) {
-    const r = computeCourse(c);
-    if (r.status === 'behind' && c.target - r.current > gap) { gap = c.target - r.current; best = c.id; }
-  }
-  return best;
-}
+export { behindCourse };
 
 /** Start-of-day housekeeping: streak rollover and today's contracts. */
 export function ensureDay(state, now) {
   const s = clone(state);
   const day = dayKey(new Date(now));
   s.career.streak = rolloverStreak(s.career.streak, day);
-  if (s.career.contracts.day !== day) {
-    const behind = behindCourse(s);
-    s.career.contracts = { day, ids: dailyContracts(day, { behind }).map(c => c.id), done: [], allPaid: false, behind };
+  if (s.career.contracts.day !== day || !Array.isArray(s.career.contracts.items)) {
+    s.career.contracts = { day, items: buildDailyContracts(s, day), allPaid: false };
   }
   return s;
 }
@@ -130,25 +120,12 @@ export function finalizeSession(state, a, now, evaluate = evaluateAchievements) 
   s.active = null;
 
   // Contracts (today's)
-  if (c.contracts.day === dayKey(new Date(now)) && Array.isArray(c.contracts.ids)) {
-    const todays = s.sessions.filter(x => dayKey(new Date(x.startedAt)) === c.contracts.day);
-    const ev = evaluateContracts(c.contracts.ids, c.contracts.done, todays, { behind: c.contracts.behind });
-    const rate = rateFor(rankIndex(c.xp), c.prestige);
-    for (const id of ev.newly) {
-      const pay = Math.round(byId(id).rewardMin * rate);
-      c.cash += pay; receipt.contractCash += pay;
-      receipt.contractsDone.push(id);
-      c.contractsCompleted = (c.contractsCompleted || 0) + 1;
-    }
-    c.contracts.done = [...c.contracts.done, ...ev.newly];
-    if (ev.allDone && !c.contracts.allPaid) {
-      const pay = Math.round(ALL_DONE_BONUS_MIN * rate);
-      c.cash += pay; receipt.contractCash += pay; c.contracts.allPaid = true;
-      receipt.bonuses.push('All contracts closed');
-    }
-  }
+  const ev = evaluateDailyContracts(s, dayKey(new Date(now)));
+  s = ev.state;
+  receipt.contractsDone = ev.newly; receipt.contractCash = ev.cash;
+  if (s.career.contracts.allPaid && !c.contracts.allPaid) receipt.bonuses.push('All contracts closed');
 
-  const rankAfter = rankIndex(c.xp);
+  const rankAfter = rankIndex(s.career.xp);
   if (rankAfter > rankBefore) receipt.promotedTo = RANKS[rankAfter].name;
 
   const ach = evaluate(s, now);
