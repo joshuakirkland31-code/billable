@@ -124,7 +124,7 @@ Visual and interaction model follows the iPhone Calendar app, in the app's dark 
 - **Topic weakness** per course: topics ranked by mistakes count and recent quiz accuracy, shown on the course page.
 
 ### 6.6b Terms and new courses (my call)
-- State holds a **list of terms** (`terms: [{ id: 'F26', name: 'Fall 2026', courses, archived }]`, `currentTermId`). Fall 2026 migrates in as the first term.
+- State keeps the **current term** in `term` (as v1) and finished terms in `pastTerms: [{ id, name, courses }]`. Importing a new term moves the current one into `pastTerms`.
 - **New courses arrive the same way as study packs:** the user sends Claude Code their new outlines (as with Fall); Claude Code writes `billable-term-<id>.json` (`{ app: 'billable-term', version: 1, term: { id, name, courses: [...same course schema as courses-data.js] } }`) which the app imports in School → "Import term". No in-app course editor beyond today's per-course edit mode.
 - Archived terms stay viewable in School (marks read-only, practice usable). Course colours are assigned per course id and persist.
 - **Exam season** is derived from data instead of hard-coded: the 23 days before the latest scheduled final of the current term (from course `finalDate`s / Exam events), falling back to Dec 1–23 for Fall 2026. Random contracts and course achievements use the current term's course ids instead of the hard-coded five.
