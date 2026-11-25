@@ -1,7 +1,7 @@
 import { describe, it, expect } from './harness.js';
-import { RANKS, RANK_THRESHOLDS, rankIndex, payFor, fineFor, streakMultiplier, doPrestige, canPrestige, progressToNext, cityFor } from '../js/economy.js';
+import { RANKS, RANK_THRESHOLDS, rankIndex, payFor, streakMultiplier, doPrestige, canPrestige, progressToNext, cityFor } from '../js/economy.js';
 
-const base = { rankIdx: 0, prestige: 0, streakCount: 0, unwatched: false, examMult: 1 };
+const base = { rankIdx: 0, prestige: 0, streakCount: 0, examMult: 1 };
 
 describe('economy', () => {
   it('has 13 ranks with the spec thresholds', () => {
@@ -17,11 +17,11 @@ describe('economy', () => {
     expect(rankIndex(7560)).toBe(3);
     expect(rankIndex(5e7)).toBe(12);
   });
-  it('payFor applies rate, length bonus, streak, exam and unwatched', () => {
+  it('payFor applies rate, length bonus, goal bonus, streak and exam', () => {
     expect(payFor(25, base)).toBe(250);
     expect(payFor(50, base)).toBe(550);
-    expect(payFor(90, { ...base, streakCount: 10, unwatched: true, examMult: 1.5 }))
-      .toBe(Math.round(90 * 10 * 1.5 * 1.25 * 1.5 * 0.8));
+    expect(payFor(90, { ...base, streakCount: 10, examMult: 1.5 }))
+      .toBe(Math.round(90 * 10 * 1.5 * 1.25 * 1.5));
     expect(payFor(10, { ...base, prestige: 1 })).toBe(110);
     expect(payFor(0, base)).toBe(0);
     expect(payFor(50, { ...base, goalHit: true })).toBe(600);
@@ -31,9 +31,6 @@ describe('economy', () => {
     expect(streakMultiplier(0)).toBe(1);
     expect(streakMultiplier(4)).toBe(1.2);
     expect(streakMultiplier(40)).toBe(2);
-  });
-  it('fine is 10% of full-session value', () => {
-    expect(fineFor(50, base)).toBe(55);
   });
   it('prestige', () => {
     expect(canPrestige({ xp: RANK_THRESHOLDS[11] })).toBe(false);
